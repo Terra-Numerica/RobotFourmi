@@ -55,8 +55,8 @@ function robot_turnOn() {
 
 function robot_turnOff() {
     activate = false
-    affichage_temporaire("S")
     stop()
+    affichage_temporaire("S")
 }
 
 radio.onReceivedValue(function (name, value) {
@@ -129,8 +129,8 @@ function cameramove() {
         let powerL = power_max * rotation / screen_width
         let powerR = power_max - power_max * rotation / screen_width
 
-        gradient_ledV2(2, powerL)
-        gradient_ledV2(1, powerR)
+        //gradient_ledV2(2, powerL)
+        //gradient_ledV2(1, powerR)
 
         if (powerL > min_power_wheel || powerR > min_power_wheel) { // permet d'éviter le bruit des moteurs qui n'ont pas assez de power
             forward(powerR, powerL)
@@ -142,10 +142,12 @@ function cameramove() {
     }
 }
 
+
+
 // les diodes révelent la puissance mise dans les roues
 function gradient_ledV2(wheel: number, current_power: number) {
     let seuil = power / 3 // car 3 couleur différentes 
-    
+
     if (current_power <= seuil) {
         DFRobotMaqueenPlus.setRGBLight(wheel, Color.RED)
     }
@@ -160,13 +162,13 @@ function gradient_ledV2(wheel: number, current_power: number) {
 
 // les couleur ne peuvent pas être 
 // allumage du même coté que la roue concérnée par le power
-function gradient_led(wheel : number , current_power : number) {
+function gradient_led(wheel: number, current_power: number) {
     let seuil = power / 6 // car 6 couleur différentes 
-    
-    if (current_power<=seuil){
+
+    if (current_power <= seuil) {
         DFRobotMaqueenPlus.setRGBLight(wheel, Color.RED)
     }
-    else if (current_power<=2*seuil){
+    else if (current_power <= 2 * seuil) {
         DFRobotMaqueenPlus.setRGBLight(wheel, Color.YELLOW)
     }
     else if (current_power <= 3 * seuil) {
@@ -181,7 +183,7 @@ function gradient_led(wheel : number , current_power : number) {
     else if (current_power <= 6 * seuil) {
         DFRobotMaqueenPlus.setRGBLight(wheel, Color.BLUE)
     }
-    
+
 }
 
 //////////// UTILITY ////////////
@@ -204,7 +206,7 @@ let activate = false
 
 /////////////////Constante//////////
 // puissance global répartie sur les roues : 250
-let power = 255 // maximum possible = 255
+let power = 255 // 255 // maximum possible = 255
 // hauteur maximal atteinte par la boite "color" sur l'écran 
 let max_height_y = 230
 // largeur de l'écran
@@ -215,8 +217,12 @@ let min_power_wheel = 30
 ////////////SETUP////////////
 huskylens.initI2c()
 huskylens.initMode(protocolAlgorithm.ALGORITHM_COLOR_RECOGNITION)
+//huskylens.initMode(protocolAlgorithm.ALGORITHM_OBJECT_TRACKING)
 radio.setGroup(1)
 
+
+DFRobotMaqueenPlus.setRGBLight(RGBLight.RGBR, Color.WHITH)
+DFRobotMaqueenPlus.setRGBLight(RGBLight.RGBL, Color.WHITH)
 
 ////////////LOOP////////////
 basic.forever(function () {

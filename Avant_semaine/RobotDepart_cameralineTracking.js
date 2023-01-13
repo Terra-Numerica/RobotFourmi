@@ -1,3 +1,5 @@
+// NOTES : DO NOT WORK FOR THE MOMENT
+
 ////////////MOVING FUNCTIONS////////////
 
 // mouve robot backword with right speed : right(int 255), left speed : left (int 255)
@@ -101,6 +103,51 @@ function searchRoad() {
 
 
 
+
+
+function moveLineV2(){
+
+    if (huskylens.isAppear(1, HUSKYLENSResultType_t.HUSKYLENSResultArrow)){
+        onRoad = true
+        //let x_start = huskylens.readeArrow(1, Content2.xOrigin)
+        //let y_start = huskylens.readeArrow(1, Content2.yOrigin)
+        // coord de la fleche
+        let x_end = huskylens.readeArrow(1, Content2.xTarget)
+        //let y_end = huskylens.readeArrow(1, Content2.yTarget)
+
+        let powerL = power * x_end / screen_width
+        let powerR = power - power * x_end / screen_width
+        music.playTone(Note.C, music.beat(BeatFraction.Whole))
+        forward(powerR,powerL)
+
+        gradient_ledV2(2, powerL)
+        gradient_ledV2(1, powerR)
+
+        // note : quand la flèche pointe à droite : actionner la roue gauche pour tourner et inversement en définsant le milieur de l'écran comme trout droite
+    }
+
+    else{
+        onRoad = false
+    }
+
+}
+
+
+// les diodes révelent la puissance mise dans les roues
+function gradient_ledV2(wheel: number, current_power: number) {
+    let seuil = power / 3 // car 3 couleur différentes 
+
+    if (current_power <= seuil) {
+        DFRobotMaqueenPlus.setRGBLight(wheel, Color.RED)
+    }
+    else if (current_power <= 2 * seuil) {
+        DFRobotMaqueenPlus.setRGBLight(wheel, Color.GREEN)
+    }
+    else if (current_power <= 3 * seuil) {
+        DFRobotMaqueenPlus.setRGBLight(wheel, Color.BLUE)
+    }
+
+}
 
 
 
@@ -227,6 +274,15 @@ let R3 = false
 let R2 = false
 let R1 = false
 
+/////////////////Constante//////////
+// puissance global répartie sur les roues : 250
+let power = 255 // maximum possible = 255
+// largeur de l'écran
+let screen_width = 320
+// Puissance minimal pour que les roues s'active : 
+let min_power_wheel = 30
+
+
 // Constante
 // durée pour être considéré comme perdu
 let TIME_TO_BE_LOST = 1500
@@ -236,31 +292,33 @@ let my_color = Color.RED
 let lastTime_foundRoad: number
 radio.setGroup(1)
 huskylens.initI2c()
-huskylens.initMode(protocolAlgorithm.ALGORITHM_TAG_RECOGNITION)
+//huskylens.initMode(protocolAlgorithm.ALGORITHM_TAG_RECOGNITION)
+huskylens.initMode(protocolAlgorithm.ALGORITHM_LINE_TRACKING)
 
 //////////// LOOP ////////////
 // Main loop des robots: verifie stade activé, si premier robot parcours line si non suit par camera.
 basic.forever(function () {
     if (activate) {
-        update_values()
+        //update_values()
         // qrCodeSwitch()
+        // TEST
+        moveLineV2()
         if (onRoad) {
             if (last_msg_send != "Run") {
                 radio.sendString("Run")
                 last_msg_send = "Run"
             }
-            moveLine()
+            //moveLine()
         } else if (!onRoad) {
             // si perd la route, stopAll robots_suiveurs
             if (last_msg_send != "Stop") {
                 radio.sendString("Stop")
                 last_msg_send = "Stop"
             }
-            searchRoad()
+            //searchRoad()
 
         }
 
-        qrCodeSwitch()
+        // qrCodeSwitch()
     }
 })
-    
