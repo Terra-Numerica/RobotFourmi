@@ -26,24 +26,24 @@ function move(l: number, r: number): void {
 /////////////////////////////////
 
 /**
- * Print a message on the diod card 
- * @param {*} msg message printed
- * @param {*} time duration of the message, default is 0.5 seconds
+ * Print a message on the LED matrix for a specified duration
+ * @param {string} message message to be displayed
+ * @param {number} duration duration of the message in milliseconds (default is 500ms)
  */
-function affichage_temporaire(msg: string, time: number = 500): void {
-    basic.showString(msg)
+function temporaryDisplayMessage(message: string, duration: number = 500): void {
+    basic.showString(message);
     control.inBackground(function () {
-        basic.pause(time)
-        basic.clearScreen()
-    })
+        basic.pause(duration);
+        basic.clearScreen();
+    });
 }
 
 
 /**
  * Turn on the bot
  */
-function BotOn(): void {
-    affichage_temporaire(MESSAGE_START);
+function turnOnRobot(): void {
+    temporaryDisplayMessage(MESSAGE_START);
     activate = true;
     music.playTone(SOUND_START, 100);
     DFRobotMaqueenPlus.setRGBLight(RGBLight.RGBR, Color.WHITH);
@@ -56,9 +56,9 @@ function BotOn(): void {
  * @param {number} v le nombre à vérifier
  * @returns la valuer corrigée si nécessaire
  */
-function outOfRange(v: number): number {
-    if (v < -POWER_MAX) return -POWER_MAX;
-    if (v > POWER_MAX) return POWER_MAX;
+function getBoundedValue(v: number): number {
+    if (v < -MAX_POWER) return -MAX_POWER;
+    if (v > MAX_POWER) return MAX_POWER;
     return v;
 }
 
@@ -68,24 +68,22 @@ function outOfRange(v: number): number {
 
 // MAIN BUTTON
 input.onLogoEvent(TouchButtonEvent.Pressed, function () {
-    activate ? BotOff() : BotOn();
+    activate ? turnOffRobot() : turnOnRobot();
 })
-
-// SAME AS LEADER
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
 // IR instructions
 IR.IR_callbackUser(function (msg) {
-    // si télécommande
-    if (msg == IR_ON_OFF) activate ? BotOff() : BotOn();
+    // if the robot is activated , it is turned off
+    // else it is turned on
+    if (msg == IR_ON_OFF) activate ? turnOffRobot() : turnOnRobot();
 })
 
 radio.onReceivedString(function (receivedString: string) {
-    // si un autre robot envoie des msg en rapport avec le contact visuel
-    if (receivedString == LOST_CONTACT_VISUEL) BotOff();
-    if (receivedString == BACK_CONTACT_VISUEL) BotOn();
+    // if another robot sends messages related to visual contact
+    if (receivedString == LOST_CONTACT_VISUEL) turnOffRobot();
+    if (receivedString == BACK_CONTACT_VISUEL) turnOnRobot();
 })
  
 
@@ -101,38 +99,35 @@ radio.onReceivedString(function (receivedString: string) {
 function followe_qrV2(): void {
     huskylens.request()
 
-    // ORDER PRIORITY --> left, right , front
+    // Follow order of priority --> left, right , front
     if (huskylens.isAppear(2, HUSKYLENSResultType_t.HUSKYLENSResultBlock)) { process_follow(2); }// left
     else if (huskylens.isAppear(3, HUSKYLENSResultType_t.HUSKYLENSResultBlock)) { process_follow(3); } // right
 
-    //front
+    // Follow front
     else if (huskylens.isAppear(1, HUSKYLENSResultType_t.HUSKYLENSResultBlock)) {
-        // process_follow(1);
-
-        // check if multi box
-        // le plus loin à la plus petite hauteur
+        // Check if there are multiple boxes
+        // From farthest to closest in terms of height
         let max_index = 1
         let max_height = huskylens.readeBox_index(1, 1, Content1.height)
         let len_box = huskylens.getBox_S(1, HUSKYLENSResultType_t.HUSKYLENSResultBlock) // nombre de box
 
         for (let i = 1; i <= len_box; i++) {
-            // num de boite commence a 1
+            // Box number starts at 1 , don't no why
             if (huskylens.readeBox_index(1, i, Content1.height) > max_height) {
                 max_height = huskylens.readeBox_index(1, i, Content1.height)
                 max_index = i
             }
         }
-        // suit le front ayant la hauteur maxiam == le qr code le plus près
+        // Follow the front with the maximum height == closest QR code
         process_follow(1, max_index);
     }
 
 
     else {
-        // check si perte récente du QR code ou non
-        if(input.runningTime() - last_qr_visible > delay_lost_qr){
-            // si temps perdu supérieur au délais établie, alors considérer comme lost
-
-            if (input.runningTime() - last_qr_visible >  lost_definitif){
+        // Check if recent loss of QR code contact or not
+        if(input.runningTime() - last_time_qr_visible > delay_lost_qr){
+            // If lost time is greater than the established delay, then consider it as lost
+            if (input.runningTime() - last_time_qr_visible >  delay_lost_definitif){
                 move(0,0)
             }
             else{
@@ -141,80 +136,99 @@ function followe_qrV2(): void {
             }   
         }
         
-        // CONTINUE DANS LA PRECEDENTE DIRECTION SI PERTE DE CONTACTE
-        // move(0, 0);
+        // Continue in the previous direction if there is loss of contact
 
     }
 
 }
 
-function process_follow(num_qr: number, num_box = 1) {
+/**
+ * Processes a detected QR code and adjusts the robot's movement accordingly
+ * @param tag - The tag associated with the qr code detected
+ * @param boxIndex - Index of the box within the detected tag (optional, default value = 1)
+ */
+function processQR(tag: number, boxIndex = 1) {
+    // If the QR code was previously lost, send a message and update the last visible time
     if (lost) {
         lost = false
-        last_qr_visible = input.runningTime() // rappelle que le qr a été retrouvé
+        // Send message to other 
+        last_time_qr_visible = input.runningTime()
         radio.sendString(BACK_CONTACT_VISUEL)
     }
 
-    // hauteur apparante du QR
-    let height = huskylens.readeBox_index(num_qr, num_box, Content1.height)
-    // x de la boite détectée
-    let x_center = huskylens.readeBox_index(num_qr, num_box, Content1.xCenter)
+    // Apparent height of QR
+    let height = huskylens.readeBox_index(tag, boxIndex, Content1.height)
+    // X-coordinate of the detected box
+    let box_position = huskylens.readeBox_index(tag, boxIndex, Content1.xCenter)
 
-    //left
-    if (num_qr == 2) {
-        x_center *= 0.75;
+    // Adjust box_position based on QR position
+    // Left
+    if (tag == 2) {
+        box_position *= 0.75;
     }
-    // right
-    if (num_qr == 3) {
-        x_center *= 1.25;
+    // Right
+    if (tag == 3) {
+        box_position *= 1.25;
     }
 
-    // estimation de la distance du QR à partir de la hauteur apparante
-    //let dist = 1501.6 - 1259.41 * Math.pow(height, 0.0322027);
-    let dist = 509.327 - 46.6558 * Math.log(0.0000276626 - 234.427 * - height)
-    // coef = ya - yb / xa - xb
-    // let coef_directeur = (0 - POWER_MAX) / (DISTANCE_MIN - DISTANCE_MAX);
-    // let power = coef_directeur * dist - POWER_MAX;
-    
-    // my_vitesse_max = 250;
-    //( ya - yb) / (xa - sb)
-    let coef_directeur = (0 - POWER_MAX) / (DISTANCE_MIN - DISTANCE_MAX);
-    let power = coef_directeur * dist - POWER_MAX;
+    // Estimation of the distance of the QR from the apparent height
+    /* Old formul :
+    Do not work because the exposant is interpreted as 0 and not as 0.0322027 
+    let dist = 1501.6 - 1259.41 * Math.pow(height, 0.0322027);
+    */
 
-    // Répartition de la puissance pour touner
-    // si tout à gauche powerL = POWER_MAX*0/SCREEN_WIDTH = 0
-// qrCodeLocation_x
+    // New formula
+    let dist = 509.327 - 46.6558 * Math.log(0.0000276626 - 234.427 * - height)    
+    // coef directeur de y = ax+b --> a = ( ya - yb) / (xa - sb)
 
+    let slop = (0 - MAX_POWER) / (DISTANCE_MIN - DISTANCE_MAX);
+    let power = slop * dist - MAX_POWER;
 
-    let powerL = (power * x_center / SCREEN_WIDTH);
-    // si tout à droite powerR = POWER_MAX - POWER_MAX*SCREEN_WIDTH/SCREEN_WIDTH = 0
-    let powerR = (power - power * x_center / SCREEN_WIDTH);
+    // Calculation of power distribution for turning
 
-    // Vérification de l'égalité entre le rapport powerL/powerR par rapport à speed_wheelL/speed_wheelR
+    // if the QR is all the way to the left, powerL = 0
+    let powerL = (power * box_position / SCREEN_WIDTH);
+    // if the QR is all the way to the right, powerR = 0
+    //let powerR = (power - power * box_position / SCREEN_WIDTH);
+    let powerR = power - powerL;
+
+    // Calibration of powerL and powerR to ensure equal movement speed
     // powerL, powerR = calibration(powerL, powerR);
+
+    // Move the robot using the calculated power distribution
     move(powerL, powerR);
 
 }
 
+
+/**
+ * Calibrates the power of the left and right wheels based on the measured speed
+ * @param powerL - Desired power for the left wheel
+ * @param powerR - Desired power for the right wheel
+ * @returns The new power values for the left and right motors.
+ * @note This function is not currently used due to sensor inaccuracies
+ */
 function calibration(powerL: number, powerR: number): number {
 
     // Speed measure
     let speedL = DFRobotMaqueenPlus.readSpeed(Motors1.M1)
     let speedR = DFRobotMaqueenPlus.readSpeed(Motors1.M1)
 
-    let ratioL = speedL / powerL // ==> vitesse obtenu par rapport à power
-    // 0 = perte total , +++ = pas de perte
-    let ratioR = speedR / powerR
+    // Calculate the efficiency ratios of the motors (speed/power)
+    let efficiencyL = speedL / powerL // efficiency of the left motor
+    let efficiencyR = speedR / powerR // efficiency of the right motor
 
-    // si perte de L inférieur à perte de R
-    if (ratioL < ratioR) {
-        // augmenter r
-        let new_r = powerR + (ratioR - ratioL) * powerR
+    // If the left motor is less efficient than the right motor, increase the right motor power
+    if (efficiencyL < efficiencyR) {
+        // Increase the power supplied to the right motor
+        let new_r = powerR + (efficiencyR - efficiencyL) * powerR
+        // Return the updated powers for both motors
         return powerL, new_r;
     }
     else {
-        // augmenter L
-        let new_l = powerL + (ratioL - ratioR) * powerL
+        // Increase the power supplied to the left motor
+        let new_l = powerL + (efficiencyL - efficiencyR) * powerL
+        // Return the updated powers for both motors
         return new_l, powerR
     }
 }
@@ -230,20 +244,20 @@ function follow_qr(): void {
         // taille apparante du QR
         let height = huskylens.readeBox(1, Content1.height)
         //let widht = huskylens.readeBox(1,Content1.width) // Largeur : tou
-        let x_center = huskylens.readeBox(1, Content1.xCenter)  // 0 
-        // let POWER_MAX = power - power * height / SCREEN_HEIGHT
+        let box_position = huskylens.readeBox(1, Content1.xCenter)  // 0 
+        // let MAX_POWER = power - power * height / SCREEN_HEIGHT
 
         // si prend tout l'écran : vitesse null
         //
 
         let distance_factor = height / SCREEN_HEIGHT
-        let power = POWER_MAX - POWER_MAX * distance_factor;
+        let power = MAX_POWER - MAX_POWER * distance_factor;
 
         // Répartition de la puissance pour touner
-        // si tout à gauche powerL = POWER_MAX*0/SCREEN_WIDTH = 0
-        let powerL = (power * x_center / SCREEN_WIDTH);
-        // si tout à droite powerR = POWER_MAX - POWER_MAX*SCREEN_WIDTH/SCREEN_WIDTH = 0
-        let powerR = (power - power * x_center / SCREEN_WIDTH);
+        // si tout à gauche powerL = MAX_POWER*0/SCREEN_WIDTH = 0
+        let powerL = (power * box_position / SCREEN_WIDTH);
+        // si tout à droite powerR = MAX_POWER - MAX_POWER*SCREEN_WIDTH/SCREEN_WIDTH = 0
+        let powerR = (power - power * box_position / SCREEN_WIDTH);
 
         // UTILISATION DE LA PUISSANCE + ALLUMAGE RGB
         move(powerL, powerR);
@@ -257,7 +271,7 @@ function follow_qr(): void {
 ////////// CONSTANT ////////// 
 
 // VALUE
-//const POWER_MAX = 120; // 255
+//const MAX_POWER = 120; // 255
 const RADIO_GROUP = 1;
 // TEXTE
 const MESSAGE_START = 'R';
@@ -291,8 +305,8 @@ let lost = false
 
 radio.setGroup(RADIO_GROUP)
 // initialise la caméra
-// huskylens.initMode(protocolAlgorithm.ALGORITHM_OBJECT_TRACKING)
 huskylens.initMode(protocolAlgorithm.ALGORITHM_TAG_RECOGNITION);
+
 ///////////////////////////////////
 //////////// MAIN LOOP ////////////
 ///////////////////////////////////
@@ -307,7 +321,6 @@ input.onButtonPressed(Button.A, function () {
     isLeader = !isLeader
     music.playTone(Note.C, 100) // joue son pendant 0,1 s pour indiquer que c'est le leader
 })
-
 
 /*
 ANCIENNE VERSION DE DETERMINATION DU LEADER
@@ -334,12 +347,12 @@ for(let i = 0 ; i < 3 ; i++){
  * Turn off the bot
  */
 // version leader
-function BotOff(): void {
-    affichage_temporaire(MESSAGE_STOP);
+function turnOffRobot(): void {
+    temporaryDisplayMessage(MESSAGE_STOP);
     move(0, 0);
     // avoid to have a fast restart
-    wheel_l = 0;
-    wheel_r = 0;
+    left_wheel_power = 0;
+    right_wheel_power = 0;
     activate = false;
     music.playTone(SOUND_STOP, 100);
     led_off();
@@ -357,7 +370,6 @@ function led_off(): void {
     DFRobotMaqueenPlus.setRGBLight(2, Color.OFF)
 }
 
-
 // les diodes révelent la puissance mise dans les roues
 /**
  * Give a color to the LEDss
@@ -366,7 +378,7 @@ function led_off(): void {
  */
 function gradient_color_led(wheel: number, current_power: number): void {
 
-    let seuil = POWER_MAX / 3 // car 3 couleur différentes 
+    let seuil = MAX_POWER / 3 // car 3 couleur différentes 
     // seuil 1
     if (current_power <= seuil) {
         DFRobotMaqueenPlus.setRGBLight(wheel, Color.RED)
@@ -387,7 +399,7 @@ function gradient_color_led(wheel: number, current_power: number): void {
 
 // MAIN BUTTON
 input.onLogoEvent(TouchButtonEvent.Pressed, function () {
-    activate ? BotOff() : BotOn();
+    activate ? turnOffRobot() : turnOnRobot();
 })
 
 // IR instructions
@@ -395,13 +407,13 @@ IR.IR_callbackUser(function (msg) {
     let now = input.runningTime();
 
     // delay command
-    if ((now - last_command) > delay_ir_command) {
+    if ((now - last_input_ir) > delay_input_ir) {
 
-        if (msg == IR_ON_OFF) activate ? BotOff() : BotOn();
+        if (msg == IR_ON_OFF) activate ? turnOffRobot() : turnOnRobot();
         // Add vérification option OU pas on verra
         if (activate && main_methode === METHODE_IR && isLeader) methode_ir(msg);
 
-        last_command = now;
+        last_input_ir = now;
     }
 
 })
@@ -422,35 +434,35 @@ input.onButtonPressed(Button.B, function () {
 function methode_ir(msg: number): void {
     switch (msg) {
         case IR_UP:
-            wheel_l += UPGRADE_POWER;
-            wheel_r += UPGRADE_POWER;
+            left_wheel_power += UPGRADE_SPEED_POWER;
+            right_wheel_power += UPGRADE_SPEED_POWER;
             break;
 
         case IR_DOWN:
-            wheel_l -= UPGRADE_POWER;
-            wheel_r -= UPGRADE_POWER;
+            left_wheel_power -= UPGRADE_SPEED_POWER;
+            right_wheel_power -= UPGRADE_SPEED_POWER;
             break;
 
         case IR_LEFT:
-            wheel_l -= upgrade_rotation;
-            wheel_r += upgrade_rotation;
+            left_wheel_power -= increament_rotation;
+            right_wheel_power += increament_rotation;
             break;
 
         case IR_RIGHT:
-            wheel_l += upgrade_rotation;
-            wheel_r -= upgrade_rotation;
+            left_wheel_power += increament_rotation;
+            right_wheel_power -= increament_rotation;
             break;
 
         default: // NOTHING 
     }
 
     // Avoid ouOfRange int
-    wheel_l = outOfRange(wheel_l);
-    wheel_r = outOfRange(wheel_r);
+    left_wheel_power = getBoundedValue(left_wheel_power);
+    right_wheel_power = getBoundedValue(right_wheel_power);
 
-    move(wheel_l, wheel_r);
-    gradient_color_led(2, wheel_l);
-    gradient_color_led(1, wheel_r);
+    move(left_wheel_power, right_wheel_power);
+    gradient_color_led(2, left_wheel_power);
+    gradient_color_led(1, right_wheel_power);
 }
 
 
@@ -528,7 +540,7 @@ function follow_line() {
 
 // VALUE
 
-const POWER_MAX = 255; // maximum value in input
+const MAX_POWER = 255; // maximum value in input
 
 // METHODE
 const METHODE_IR = "IR";
@@ -540,15 +552,13 @@ const IR_DOWN = 199;
 const IR_LEFT = 200;
 const IR_RIGHT = 201;
 // puissance ajoutée à chaque pression d'accélération / décélération
-//const UPGRADE_POWER = 25;
-//const upgrade_rotation = 1 / 3 * UPGRADE_POWER;
-const UPGRADE_POWER = 50;
+const UPGRADE_SPEED_POWER = 50;
 
 
-let wheel_l = 0;
-let wheel_r = 0;
+let left_wheel_power = 0;
+let right_wheel_power = 0;
 let FACTOR_ROTATION = 2 / 10; // permet à la rotation de pas être trop vioente et constante
-let upgrade_rotation: number;
+let increament_rotation: number;
 
 ////////// DEFAULT //////////
 
@@ -564,44 +574,32 @@ let main_methode = DEFAULT_METHODE;
 
 ////////////////////////////////////////////// INIT //////////////////////////////////////////////
 radio.setGroup(RADIO_GROUP)
-// // initialise la caméra
-// huskylens.initI2c()
 
-const delay_ir_command = 500; //millisecond  // évite de spmmer la télécommande
-let last_command = input.runningTime(); // date de quand le dernier input à était émis
+const delay_input_ir = 500; //millisecond  // évite de spmmer la télécommande
+let last_input_ir = input.runningTime(); // date de quand le dernier input à était émis
 
 const delay_lost_qr = 1000 // ms // évite de dire "lost" (et donc de tout stopper) à la moindre perte de contacte
-let last_qr_visible = input.runningTime(); // date de la dernier fois ou le qr a été vu
-const lost_definitif = 2500 // ms
+let last_time_qr_visible = input.runningTime(); // date de la dernier fois ou le qr a été vu
+const delay_lost_definitif = 2500 // ms
 
 ///////////////////////////////////
 //////////// MAIN LOOP ////////////
 ///////////////////////////////////
 
-
-/////////////////END CTRL////////////////////
-
-
-
 basic.forever(function () {
-
-    // pins.digitalWritePin(DigitalPin.P0, 1)
-    // quasiment rien comme courrant --> impossible que ça s'allume
-
+    // if the robot is not the leader
     if (!isLeader) {
-        // si activate
+        // and if the robot is actived
         if (activate) {
-            //follow le qr
+            // the robot follow the qr code of the previous robot
             followe_qrV2();
         }
     }
 
-    // leader
+    // if the robot is the leader and the robot is actived
     else if (activate) {
-        // actualise la rotation
-        upgrade_rotation = (wheel_l + wheel_r) * FACTOR_ROTATION;
-        radio.sendValue("vitesse", (wheel_l + wheel_r) / 2);
-        // peremet de conserver un angle constant
-
+        // the incrementation of the rotation is calculated with the speed of the robot
+        // this allow to keep the same rotation speed even if the robot is faster or slower
+        increament_rotation = (left_wheel_power + right_wheel_power) * FACTOR_ROTATION;
     }
 })
