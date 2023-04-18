@@ -233,7 +233,7 @@ function calibration(powerL: number, powerR: number): number {
     }
 }
 
-
+// old unused function
 function follow_qr(): void {
     huskylens.request()
     if (huskylens.isAppear(1, HUSKYLENSResultType_t.HUSKYLENSResultBlock)) {
@@ -346,16 +346,22 @@ for(let i = 0 ; i < 3 ; i++){
 /**
  * Turn off the bot
  */
-// version leader
 function turnOffRobot(): void {
+    // Display a stop message temporarily.
     temporaryDisplayMessage(MESSAGE_STOP);
+    // Stop the movement of the robot.
     move(0, 0);
     // avoid to have a fast restart
+    // Set the power of the left wheel to zero.
     left_wheel_power = 0;
+    // Set the power of the right wheel to zero.
     right_wheel_power = 0;
+    // Set the robot to inactive state.
     activate = false;
+    // Play a tone to indicate that the robot has been turned off.
     music.playTone(SOUND_STOP, 100);
-    led_off();
+    // Turn off the LEDs.
+    turnOffLEDs();
 }
 
 ///////////////////////////////////////
@@ -363,9 +369,9 @@ function turnOffRobot(): void {
 ///////////////////////////////////////
 
 /**
- * Turn off the LEDs
+ * Turn off the RGB LEDs
  */
-function led_off(): void {
+function turnOffLEDs(): void {
     DFRobotMaqueenPlus.setRGBLight(1, Color.OFF)
     DFRobotMaqueenPlus.setRGBLight(2, Color.OFF)
 }
@@ -376,19 +382,20 @@ function led_off(): void {
  * @param {*} wheel the side associated with the wheel
  * @param {number} current_power the power associated with the wheel
  */
-function gradient_color_led(wheel: number, current_power: number): void {
+function setLEDColorByPower(wheel: number, current_power: number): void {
 
-    let seuil = MAX_POWER / 3 // car 3 couleur différentes 
-    // seuil 1
-    if (current_power <= seuil) {
+    let threshold = MAX_POWER / 3 // Three different colors
+    // Choose the LED color based on the power put into the wheel.
+    // threshold 1
+    if (current_power <= threshold) {
         DFRobotMaqueenPlus.setRGBLight(wheel, Color.RED)
     }
-    // seuil 2
-    else if (current_power <= 2 * seuil) {
+    // threshold 2
+    else if (current_power <= 2 * threshold) {
         DFRobotMaqueenPlus.setRGBLight(wheel, Color.GREEN)
     }
-    // seuil 3
-    else if (current_power <= 3 * seuil) {
+    // threshold 3
+    else if (current_power <= 3 * threshold) {
         DFRobotMaqueenPlus.setRGBLight(wheel, Color.BLUE)
     }
 }
@@ -461,8 +468,8 @@ function methode_ir(msg: number): void {
     right_wheel_power = getBoundedValue(right_wheel_power);
 
     move(left_wheel_power, right_wheel_power);
-    gradient_color_led(2, left_wheel_power);
-    gradient_color_led(1, right_wheel_power);
+    setLEDColorByPower(2, left_wheel_power);
+    setLEDColorByPower(1, right_wheel_power);
 }
 
 
