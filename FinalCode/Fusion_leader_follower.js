@@ -1,3 +1,131 @@
+//////////////////////////////
+////////// CONSTANT //////////
+//////////////////////////////
+
+// RADIO
+const RADIO_GROUP = 1;
+const LOST_CONTACT_VISUEL = "lost"
+const BACK_CONTACT_VISUEL = "back"
+// PRINT
+const MESSAGE_START = 'R';
+const MESSAGE_STOP = 'S';
+// SOUND
+const SOUND_START = Note.A;
+const SOUND_STOP = Note.B;
+const SOUND_ALARM = Note.C;
+const SOUND_CHOICE_A = Note.D;
+const SOUND_CHOICE_B = Note.E;
+// IR
+const IR_ON_OFF = 129;
+const IR_UP = 198;
+const IR_DOWN = 199;
+const IR_LEFT = 200;
+const IR_RIGHT = 201;
+// SCREEN DIMENSION
+const SCREEN_WIDTH = 320;
+const SCREEN_HEIGHT = 240;
+// Desired distance between leader and follower (in centimeter)
+const DISTANCE_MAX = 100;
+const DISTANCE_MIN = 50; // D2termination de la distance marche pas ??? 
+// METHODE OF LEADER BOT
+const METHODE_IR = "IR";
+const METHODE_LINE = "LINE";
+const METHODE_FUNCTION = "FUNCTION";
+const DEFAULT_METHODE = METHODE_IR; // // DEFAULT METHODE
+// VALUE
+const MAX_POWER = 255; // maximum value in input
+const UPGRADE_SPEED_POWER = 50; // power added to each press of acceleration / deceleration
+const FACTOR_ROTATION = 2 / 10; // angle apply at each press of rotation
+// INTERACTION DELAY
+const DELAY_INPUT_IR = 500; //millisecond  // évite de spmmer la télécommande
+const DELAY_LOST_QR = 1000 // ms // évite de dire "lost" (et donc de tout stopper) à la moindre perte de contacte
+const DELAY_LOST_DEFINITIF = 2500 // ms
+
+//////////////////////////////
+///// GLOBALES VARIABLES /////
+//////////////////////////////
+
+// indicate if the robot is activated or not
+let activate = false;
+// indicate if the robot is lost or not
+let lost = false
+// date of the last interaction with the IR remote control
+let last_input_ir = input.runningTime();
+// date of the last time the QR code was seen
+let last_time_qr_visible = input.runningTime();
+// current power of the wheels
+let left_wheel_power = 0;
+let right_wheel_power = 0;
+// power add during a rotation
+let increament_rotation: number;
+// methode used to by the leader bot
+let main_methode = DEFAULT_METHODE;
+// indicate if the robot is the leader or not
+let isLeader = false
+
+//////////////////////////////
+//////////// INIT //////////// 
+//////////////////////////////
+
+// le bot devient lieader si on appuit sur A
+input.onButtonPressed(Button.A, function () {
+    isLeader = !isLeader
+    // play a sound to indicate that the robot is now the leader
+    music.playTone(Note.C, 100)
+})
+
+// set the radio group
+radio.setGroup(RADIO_GROUP)
+// init the huskylens cam to the algorithm of tag recognition
+huskylens.initMode(protocolAlgorithm.ALGORITHM_TAG_RECOGNITION);
+
+/*
+ANCIENNE VERSION DE DETERMINATION DU LEADER
+// on se donne 3 essaies de request
+// marche jamais sur l'essaie 1 je c pas pk
+
+for(let i = 0 ; i < 3 ; i++){
+    huskylens.request()
+    if(huskylens.isAppear(1, HUSKYLENSResultType_t.HUSKYLENSResultBlock)) {
+        isLeader = false
+    }
+}
+*/
+
+///////////////////////////////////////
+//////////// EVENT and CHOICE//////////
+///////////////////////////////////////
+
+// MAIN BUTTON
+input.onLogoEvent(TouchButtonEvent.Pressed, function () {
+    activate ? turnOffRobot() : turnOnRobot();
+})
+
+// IR instructions
+IR.IR_callbackUser(function (msg) {
+    // if the robot is activated , it is turned off
+    // else it is turned on
+    if (msg == IR_ON_OFF) activate ? turnOffRobot() : turnOnRobot();
+})
+
+// RADIO
+radio.onReceivedString(function (receivedString: string) {
+    // if another robot sends messages related to visual contact
+    if (receivedString == LOST_CONTACT_VISUEL) turnOffRobot();
+    if (receivedString == BACK_CONTACT_VISUEL) turnOnRobot();
+})
+
+
+input.onButtonPressed(Button.B, function () {
+    main_methode = METHODE_FUNCTION;
+})
+
+/*
+input.onButtonPressed(Button.A, function () {
+    main_methode = METHODE_LINE;
+})
+*/
+
 ////////////////////////////////////////
 ////////////MOVING FUNCTIONS////////////
 ////////////////////////////////////////
@@ -19,7 +147,6 @@ function move(l: number, r: number): void {
         DFRobotMaqueenPlus.mototRun(Motors.M2, r < 0 ? Dir.CCW : Dir.CW, Math.abs(r));
     }
 }
-
 
 /////////////////////////////////
 //////////// UTILITY ////////////
@@ -62,37 +189,9 @@ function getBoundedValue(v: number): number {
     return v;
 }
 
-///////////////////////////////////////
-//////////// EVENT and CHOICE//////////
-///////////////////////////////////////
-
-// MAIN BUTTON
-input.onLogoEvent(TouchButtonEvent.Pressed, function () {
-    activate ? turnOffRobot() : turnOnRobot();
-})
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// IR instructions
-IR.IR_callbackUser(function (msg) {
-    // if the robot is activated , it is turned off
-    // else it is turned on
-    if (msg == IR_ON_OFF) activate ? turnOffRobot() : turnOnRobot();
-})
-
-radio.onReceivedString(function (receivedString: string) {
-    // if another robot sends messages related to visual contact
-    if (receivedString == LOST_CONTACT_VISUEL) turnOffRobot();
-    if (receivedString == BACK_CONTACT_VISUEL) turnOnRobot();
-})
- 
-
 ///////////////////////////////
-//////////// SETUP ////////////
+//////////// GLOBAL ///////////
 ///////////////////////////////
-
-
-//////////////////////////////////////////////GENERAL//////////////////////////////////////////////
 
 // function qr : similar to function follow_motif
 // V2 de follow_motif
@@ -125,9 +224,9 @@ function followe_qrV2(): void {
 
     else {
         // Check if recent loss of QR code contact or not
-        if(input.runningTime() - last_time_qr_visible > delay_lost_qr){
+        if(input.runningTime() - last_time_qr_visible > DELAY_LOST_QR){
             // If lost time is greater than the established delay, then consider it as lost
-            if (input.runningTime() - last_time_qr_visible >  delay_lost_definitif){
+            if (input.runningTime() - last_time_qr_visible >  DELAY_LOST_DEFINITIF){
                 move(0,0)
             }
             else{
@@ -147,7 +246,7 @@ function followe_qrV2(): void {
  * @param tag - The tag associated with the qr code detected
  * @param boxIndex - Index of the box within the detected tag (optional, default value = 1)
  */
-function processQR(tag: number, boxIndex = 1) {
+function process_follow(tag: number, boxIndex = 1) {
     // If the QR code was previously lost, send a message and update the last visible time
     if (lost) {
         lost = false
@@ -233,7 +332,9 @@ function calibration(powerL: number, powerR: number): number {
     }
 }
 
+
 // old unused function
+
 function follow_qr(): void {
     huskylens.request()
     if (huskylens.isAppear(1, HUSKYLENSResultType_t.HUSKYLENSResultBlock)) {
@@ -268,74 +369,10 @@ function follow_qr(): void {
     }
 }
 
-////////// CONSTANT ////////// 
-
-// VALUE
-//const MAX_POWER = 120; // 255
-const RADIO_GROUP = 1;
-// TEXTE
-const MESSAGE_START = 'R';
-const MESSAGE_STOP = 'S';
-// SOUND
-const SOUND_START = Note.A;
-const SOUND_STOP = Note.B;
-const SOUND_ALARM = Note.C;
-const SOUND_CHOICE_A = Note.D;
-const SOUND_CHOICE_B = Note.E;
-// IR CONSTANT
-const IR_ON_OFF = 129;
-const LOST_CONTACT_VISUEL = "lost"
-const BACK_CONTACT_VISUEL = "back"
-// SCREEN
-const SCREEN_WIDTH = 320;
-const SCREEN_HEIGHT = 240;
-
-// Distance souhaitée entre meneur et follower (en centimetre)
-const DISTANCE_MAX = 100;
-const DISTANCE_MIN = 50; // D2termination de la distance marche pas ??? 
-
-////////// GLOBALES VARIABLES //////////
-let activate = false;
-
-// indique s'il est perdu ou pas
-let lost = false
-
-
-////////////////////////////////////////////// INIT //////////////////////////////////////////////
-
-radio.setGroup(RADIO_GROUP)
-// initialise la caméra
-huskylens.initMode(protocolAlgorithm.ALGORITHM_TAG_RECOGNITION);
 
 ///////////////////////////////////
 //////////// MAIN LOOP ////////////
 ///////////////////////////////////
-
-
-// on se donne 3 essaies de request
-// marche jamais sur l'essaie 1 je c pas pk
-
-let isLeader = false
-// le bot devient lieader si on appuit sur A
-input.onButtonPressed(Button.A, function () {
-    isLeader = !isLeader
-    music.playTone(Note.C, 100) // joue son pendant 0,1 s pour indiquer que c'est le leader
-})
-
-/*
-ANCIENNE VERSION DE DETERMINATION DU LEADER
-huskylens.initMode(protocolAlgorithm.ALGORITHM_TAG_RECOGNITION);
-
-for(let i = 0 ; i < 3 ; i++){
-    huskylens.request()
-    if(huskylens.isAppear(1, HUSKYLENSResultType_t.HUSKYLENSResultBlock)) {
-        isLeader = false
-    }
-}
-*/
-
-
-//////////////// LEADER CTRL-C / CTRL-V //////////////////////
 
 
 /////////////////////////////////
@@ -414,7 +451,7 @@ IR.IR_callbackUser(function (msg) {
     let now = input.runningTime();
 
     // delay command
-    if ((now - last_input_ir) > delay_input_ir) {
+    if ((now - last_input_ir) > DELAY_INPUT_IR) {
 
         if (msg == IR_ON_OFF) activate ? turnOffRobot() : turnOnRobot();
         // Add vérification option OU pas on verra
@@ -424,14 +461,7 @@ IR.IR_callbackUser(function (msg) {
     }
 
 })
-/*
-input.onButtonPressed(Button.A, function () {
-    main_methode = METHODE_LINE;
-})
-*/
-input.onButtonPressed(Button.B, function () {
-    main_methode = METHODE_FUNCTION;
-})
+
 
 ///////////////////////////////////////
 //////////// MAIN FUNCTION ////////////
@@ -530,64 +560,6 @@ function methode_line() {
         move(10, 100)
     }
 }
-
-// permet de suivre une ligne grace au sensor distribution R3 R2 R1 L1 L2 L3 si readPatrol == 1 signifie au dessus de ligne noire
-function follow_line() {
-
-}
-
-///////////////////////////////
-//////////// SETUP ////////////
-///////////////////////////////
-
-
-//////////////////////////////////////////////GENERAL//////////////////////////////////////////////
-
-////////// CONSTANT ////////// 
-
-// VALUE
-
-const MAX_POWER = 255; // maximum value in input
-
-// METHODE
-const METHODE_IR = "IR";
-const METHODE_LINE = "LINE";
-const METHODE_FUNCTION = "FUNCTION";
-
-const IR_UP = 198;
-const IR_DOWN = 199;
-const IR_LEFT = 200;
-const IR_RIGHT = 201;
-// puissance ajoutée à chaque pression d'accélération / décélération
-const UPGRADE_SPEED_POWER = 50;
-
-
-let left_wheel_power = 0;
-let right_wheel_power = 0;
-let FACTOR_ROTATION = 2 / 10; // permet à la rotation de pas être trop vioente et constante
-let increament_rotation: number;
-
-////////// DEFAULT //////////
-
-const DEFAULT_METHODE = METHODE_IR;
-
-////////// GLOBALES VARIABLES //////////
-let main_methode = DEFAULT_METHODE;
-// à l'arrêt
-
-
-////////////////////////////////////////////// METHODE //////////////////////////////////////////////
-
-
-////////////////////////////////////////////// INIT //////////////////////////////////////////////
-radio.setGroup(RADIO_GROUP)
-
-const delay_input_ir = 500; //millisecond  // évite de spmmer la télécommande
-let last_input_ir = input.runningTime(); // date de quand le dernier input à était émis
-
-const delay_lost_qr = 1000 // ms // évite de dire "lost" (et donc de tout stopper) à la moindre perte de contacte
-let last_time_qr_visible = input.runningTime(); // date de la dernier fois ou le qr a été vu
-const delay_lost_definitif = 2500 // ms
 
 ///////////////////////////////////
 //////////// MAIN LOOP ////////////
