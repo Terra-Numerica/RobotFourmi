@@ -16,7 +16,3 @@ function affichage_temporaire(msg: string, time: number = 500): void {
 IR.IR_callbackUser(function(msg){
     affichage_temporaire(convertToText(msg));
 });
-
-basic.forever(function () {
-	
-})

@@ -26,12 +26,12 @@ const SCREEN_WIDTH = 320;
 const SCREEN_HEIGHT = 240;
 // Desired distance between leader and follower (in centimeter)
 const DISTANCE_MAX = 100;
-const DISTANCE_MIN = 50; // D2termination de la distance marche pas ??? 
+const DISTANCE_MIN = 50;
 // METHODE OF LEADER BOT
 const METHODE_IR = "IR";
 const METHODE_LINE = "LINE";
 const METHODE_FUNCTION = "FUNCTION";
-const DEFAULT_METHODE = METHODE_IR; // // DEFAULT METHODE
+const DEFAULT_METHODE = METHODE_IR; // DEFAULT METHODE
 // VALUE
 const MAX_POWER = 255; // maximum value in input
 const UPGRADE_SPEED_POWER = 50; // power added to each press of acceleration / deceleration
@@ -67,20 +67,13 @@ let isLeader = false
 //////////// INIT //////////// 
 //////////////////////////////
 
-// le bot devient lieader si on appuit sur A
-input.onButtonPressed(Button.A, function () {
-    isLeader = !isLeader
-    // play a sound to indicate that the robot is now the leader
-    music.playTone(Note.C, 100)
-})
-
 // set the radio group
 radio.setGroup(RADIO_GROUP)
 // init the huskylens cam to the algorithm of tag recognition
 huskylens.initMode(protocolAlgorithm.ALGORITHM_TAG_RECOGNITION);
 
 /*
-ANCIENNE VERSION DE DETERMINATION DU LEADER
+ANCIENNE VERSION DE DETERMINATION DU LEADER sur base de visuel du QR Code
 // on se donne 3 essaies de request
 // marche jamais sur l'essaie 1 je c pas pk
 
@@ -115,6 +108,13 @@ radio.onReceivedString(function (receivedString: string) {
     if (receivedString == BACK_CONTACT_VISUEL) turnOnRobot();
 })
 
+// the robot becomes the leader when the A button is pressed
+input.onButtonPressed(Button.A, function () {
+    isLeader = !isLeader
+    // play a sound to indicate that the robot is now the leader
+    music.playTone(Note.C, 100)
+})
+
 
 input.onButtonPressed(Button.B, function () {
     main_methode = METHODE_FUNCTION;
@@ -138,7 +138,6 @@ input.onButtonPressed(Button.A, function () {
  * @argument if value == 0 => stop wheels
  */
 function move(l: number, r: number): void {
-
     // To avoid noise when low power
     if (l >= -10 && l <= 10 && r >= -10 && r <= 10) {
         DFRobotMaqueenPlus.mototStop(Motors.ALL);
@@ -176,6 +175,27 @@ function turnOnRobot(): void {
     DFRobotMaqueenPlus.setRGBLight(RGBLight.RGBR, Color.WHITH);
     DFRobotMaqueenPlus.setRGBLight(RGBLight.RGBL, Color.WHITH);
 
+}
+
+/**
+ * Turn off the bot
+ */
+function turnOffRobot(): void {
+    // Display a stop message temporarily.
+    temporaryDisplayMessage(MESSAGE_STOP);
+    // Stop the movement of the robot.
+    move(0, 0);
+    // avoid to have a fast restart
+    // Set the power of the left wheel to zero.
+    left_wheel_power = 0;
+    // Set the power of the right wheel to zero.
+    right_wheel_power = 0;
+    // Set the robot to inactive state.
+    activate = false;
+    // Play a tone to indicate that the robot has been turned off.
+    music.playTone(SOUND_STOP, 100);
+    // Turn off the LEDs.
+    turnOffLEDs();
 }
 
 /**
@@ -369,37 +389,6 @@ function follow_qr(): void {
     }
 }
 
-
-///////////////////////////////////
-//////////// MAIN LOOP ////////////
-///////////////////////////////////
-
-
-/////////////////////////////////
-//////////// UTILITY ////////////
-/////////////////////////////////
-
-
-/**
- * Turn off the bot
- */
-function turnOffRobot(): void {
-    // Display a stop message temporarily.
-    temporaryDisplayMessage(MESSAGE_STOP);
-    // Stop the movement of the robot.
-    move(0, 0);
-    // avoid to have a fast restart
-    // Set the power of the left wheel to zero.
-    left_wheel_power = 0;
-    // Set the power of the right wheel to zero.
-    right_wheel_power = 0;
-    // Set the robot to inactive state.
-    activate = false;
-    // Play a tone to indicate that the robot has been turned off.
-    music.playTone(SOUND_STOP, 100);
-    // Turn off the LEDs.
-    turnOffLEDs();
-}
 
 ///////////////////////////////////////
 /////////////////COLOR/////////////////
