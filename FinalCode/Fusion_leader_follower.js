@@ -36,10 +36,12 @@ const DEFAULT_METHODE = METHODE_IR; // DEFAULT METHODE
 const MAX_POWER = 255; // maximum value in input
 const UPGRADE_SPEED_POWER = 50; // power added to each press of acceleration / deceleration
 const FACTOR_ROTATION = 2 / 10; // angle apply at each press of rotation
+const MAX_DIFFERENCIAL_RATIO = 1 / 3; // max différencial between wheels
 // INTERACTION DELAY
 const DELAY_INPUT_IR = 500; //millisecond  // évite de spmmer la télécommande
 const DELAY_LOST_QR = 1000 // ms // évite de dire "lost" (et donc de tout stopper) à la moindre perte de contacte
 const DELAY_LOST_DEFINITIF = 2500 // ms
+
 
 //////////////////////////////
 ///// GLOBALES VARIABLES /////
@@ -67,6 +69,7 @@ let isLeader = false
 //////////// INIT //////////// 
 //////////////////////////////
 
+
 // set the radio group
 radio.setGroup(RADIO_GROUP)
 // init the huskylens cam to the algorithm of tag recognition
@@ -84,6 +87,7 @@ for(let i = 0 ; i < 3 ; i++){
     }
 }
 */
+
 
 ///////////////////////////////////////
 //////////// EVENT and CHOICE//////////
@@ -244,17 +248,17 @@ function followe_qrV2(): void {
 
     else {
         // Check if recent loss of QR code contact or not
-        if(input.runningTime() - last_time_qr_visible > DELAY_LOST_QR){
+        if (input.runningTime() - last_time_qr_visible > DELAY_LOST_QR) {
             // If lost time is greater than the established delay, then consider it as lost
-            if (input.runningTime() - last_time_qr_visible >  DELAY_LOST_DEFINITIF){
-                move(0,0)
+            if (input.runningTime() - last_time_qr_visible > DELAY_LOST_DEFINITIF) {
+                move(0, 0)
             }
-            else{
+            else {
                 radio.sendString(LOST_CONTACT_VISUEL)
                 lost = true
-            }   
+            }
         }
-        
+
         // Continue in the previous direction if there is loss of contact
 
     }
@@ -297,7 +301,7 @@ function process_follow(tag: number, boxIndex = 1) {
     */
 
     // New formula
-    let dist = 509.327 - 46.6558 * Math.log(0.0000276626 - 234.427 * - height)    
+    let dist = 509.327 - 46.6558 * Math.log(0.0000276626 - 234.427 * - height)
     // coef directeur de y = ax+b --> a = ( ya - yb) / (xa - sb)
 
     let slop = (0 - MAX_POWER) / (DISTANCE_MIN - DISTANCE_MAX);
@@ -458,6 +462,10 @@ IR.IR_callbackUser(function (msg) {
 
 ///////// IR /////////
 function methode_ir(msg: number): void {
+    // have to be declared here because scope of "case"
+    let new_left_power : number;
+    let new_right_power : number;
+
     switch (msg) {
         case IR_UP:
             left_wheel_power += UPGRADE_SPEED_POWER;
@@ -470,13 +478,43 @@ function methode_ir(msg: number): void {
             break;
 
         case IR_LEFT:
-            left_wheel_power -= increament_rotation;
-            right_wheel_power += increament_rotation;
+            // if differencial ratio between left and right wheel power is too high, do nothing
+            // avoid doing a 360° turn
+            new_left_power = left_wheel_power - increament_rotation 
+            new_right_power = right_wheel_power + increament_rotation
+
+            // avoide divide by 0
+            if (Math.max(new_left_power, new_right_power) != 0) {
+                let ratio = Math.min(new_left_power, new_right_power) / Math.max(new_left_power, new_right_power)
+                // avoide to much rotation
+                if (ratio < MAX_DIFFERENCIAL_RATIO) {
+                    //temporaryDisplayMessage(convertToText(ratio),0)
+                    break;
+                } else {
+                    left_wheel_power = new_left_power;
+                    right_wheel_power = new_right_power;
+                }
+            }
+
+            
             break;
 
         case IR_RIGHT:
-            left_wheel_power += increament_rotation;
-            right_wheel_power -= increament_rotation;
+            // if differencial ratio between left and right wheel power is too high, do nothing
+            // avoid doing a 360° turn
+            new_left_power = left_wheel_power + increament_rotation
+            new_right_power = right_wheel_power - increament_rotation
+
+            if (Math.max(new_left_power, new_right_power) != 0) {
+                let ratio = Math.min(new_left_power, new_right_power) / Math.max(new_left_power, new_right_power)
+                if (ratio < MAX_DIFFERENCIAL_RATIO) {
+                    //temporaryDisplayMessage(convertToText(ratio),0)
+                    break;
+                } else {
+                    left_wheel_power = new_left_power;
+                    right_wheel_power = new_right_power;
+                }
+            }
             break;
 
         default: // NOTHING 
