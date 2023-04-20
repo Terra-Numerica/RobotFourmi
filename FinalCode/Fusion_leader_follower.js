@@ -42,7 +42,6 @@ const DELAY_INPUT_IR = 500; //millisecond  // évite de spmmer la télécommande
 const DELAY_LOST_QR = 1000 // ms // évite de dire "lost" (et donc de tout stopper) à la moindre perte de contacte
 const DELAY_LOST_DEFINITIF = 2500 // ms
 
-
 //////////////////////////////
 ///// GLOBALES VARIABLES /////
 //////////////////////////////
@@ -64,6 +63,7 @@ let increament_rotation: number;
 let main_methode = DEFAULT_METHODE;
 // indicate if the robot is the leader or not
 let isLeader = false
+
 
 //////////////////////////////
 //////////// INIT //////////// 
@@ -87,6 +87,7 @@ for(let i = 0 ; i < 3 ; i++){
     }
 }
 */
+
 
 
 ///////////////////////////////////////
@@ -122,6 +123,7 @@ input.onButtonPressed(Button.A, function () {
 
 input.onButtonPressed(Button.B, function () {
     main_methode = METHODE_FUNCTION;
+    f
 })
 
 /*
@@ -325,6 +327,60 @@ function process_follow(tag: number, boxIndex = 1) {
 
 
 /**
+ * Moves the robot with the given direction and power associated
+ * The direction is defined by the angle given
+ * The power is reparted in the wheel depending on the angle
+ * @param {number} angle - The angle of the direction of the robot
+ * @param {number} power - The power of the robot
+ */
+function move_angle(angle, power) {
+    // If the angle is negative, then the robot will turn to the left
+    // If the angle is positive, then the robot will turn to the right
+    // 90° angle = full turn to the right
+    // -90° angle = full turn to the left
+    // 0° angle = no turn --> the robot will go straight forward
+
+    let left_power ;
+    let right_power ;
+    move(left_power, right_power);
+
+
+}
+
+/**
+ * Moves the robot with the given direction and power associated
+ * The direction is defined by the angle given
+ * The power is reparted in the wheel depending on the angle
+ * @param {number} angle - The angle of the direction of the robot
+ * @param {number} power - The power of the robot
+ */
+function move_angle(angle, power) {
+    // Convert the angle to radians
+    angle = angle * Math.PI / 180;
+  
+    // Calculate the left and right power using trigonometry
+    let left_power = Math.sin(angle + Math.PI / 4) * power;
+    let right_power = Math.cos(angle + Math.PI / 4) * power;
+  
+    // Call the move function with the calculated powers
+    move(left_power, right_power);
+  }
+  
+
+
+
+/*
+Angle de 0 = position à 1/2* SCREEN_WIDTH
+power 
+
+
+
+
+
+*/
+
+
+/**
  * Calibrates the power of the left and right wheels based on the measured speed
  * @param powerL - Desired power for the left wheel
  * @param powerR - Desired power for the right wheel
@@ -486,7 +542,6 @@ function methode_ir(msg: number): void {
             // avoide divide by 0
             if (Math.max(new_left_power, new_right_power) != 0) {
                 let ratio = Math.min(new_left_power, new_right_power) / Math.max(new_left_power, new_right_power)
-                // avoide to much rotation
                 if (ratio < MAX_DIFFERENCIAL_RATIO) {
                     //temporaryDisplayMessage(convertToText(ratio),0)
                     break;
@@ -591,6 +646,8 @@ function methode_line() {
 ///////////////////////////////////
 //////////// MAIN LOOP ////////////
 ///////////////////////////////////
+
+
 
 basic.forever(function () {
     // if the robot is not the leader

@@ -1,6 +1,12 @@
 let old_speed_l = 0;
 let old_speed_r = 0;
 
+
+
+
+let previousY = 0;
+const vitesse_by_power = 0.387 / 2;
+
 function calibration(powerL: number, powerR: number) {
     // Speed measure
     let speedL = DFRobotMaqueenPlus.readSpeed(Motors1.M1);
@@ -22,7 +28,7 @@ function calibration(powerL: number, powerR: number) {
         // augmenter L
         let new_l = powerL + (efficiencyL - efficiencyR) * powerL;
         return [new_l, powerR];
-    } else{
+    } else {
         return [powerL, powerR];
     }
 }
@@ -56,19 +62,125 @@ let activate = false;
 
 input.onLogoEvent(TouchButtonEvent.Pressed, function () {
     if (activate) {
-        move(10, 0);
+        move(0, 0);
     }
     activate = !activate;
 })
 
 
+
+
+/**
+ * Moves the robot with the given direction and power associated
+ * The direction is defined by the angle given
+ * The power is reparted in the wheel depending on the angle
+ * @param {number} angle - The angle of the direction of the robot
+ * @param {number} power - The power of the robot
+ */
+function move_angleDegrees(angle: number, power: number) {
+    // Convert the angle to radians
+    angle = angle * Math.PI / 180;
+
+    // Calculate the left and right power using trigonometry
+    // The left power is calculated using the sine of the angle plus 45 degrees
+    // The right power is calculated using the cosine of the angle plus 45 degrees
+    let left_power = Math.sin(angle + Math.PI / 4) * power;
+    let right_power = Math.cos(angle + Math.PI / 4) * power;
+
+    // Call the move function with the calculated powers
+    // The left and right powers are passed as parameters to the move function
+    move(left_power, right_power);
+}
+
+function move_angleRadian(angle: number, power: number) {
+    let left_power = Math.sin(angle + Math.PI / 2) * power;
+    let right_power = Math.cos(angle + Math.PI / 2) * power;
+    move(left_power, right_power);
+
+}
+
+
+//const path = (x: number) => {return Math.sin(x)};
+// const path = (x: number) => { return x };
+const path = (x: number) => { return 5 * Math.sin(x * 5) };
+
+
+/**
+ * Makes the robot follow the given path function at the given speed
+ * @param {Function} path - The path function to follow
+ * @param {number} speed - The speed at which to follow the path
+ */
+function followPath(path: (x: number) => number, speed: number) {
+    let x = 0; // Start at x = 0
+    let previous_angle = 0
+    // delta_angle = 0
+
+    // Continuously calculate the angle required to follow the path and move the robot
+    forever(() => {
+        // Calculate the angle required to follow the path at the current x value
+        let h = 0.0001 // tend vers 0
+        let slope = (path(x + h) - path(x)) / h;
+        //console.log( slope)
+        console.logValue("path", path(x))
+        console.logValue("slope", slope)
+
+        let angle = Math.atan(slope) * 180 / Math.PI;
+        let delta_angle = angle - previous_angle;
+        // delta_angle = delta_angle + angle - previous_angle
+        previous_angle = angle
+
+        // Move the robot with the calculated angle and speed
+        move_angleDegrees(delta_angle, speed);
+
+        console.logValue("angle ", angle)
+        console.logValue("delta_angle", delta_angle)
+        // Increment the x value
+        x += 0.0000001;
+
+        previous_slope = slope
+
+        // Pause for a short time to allow the robot to move before calculating the next angle
+        //pause(10);
+    });
+}
+
+let previous_slope = (path(0 + 0.01) - path(0)) / 0.01;
+
+followPath(path, 100);
+
+
+
+
+input.onButtonPressed(Button.B, function () {
+    let timer = input.runningTime()
+    let decal = 10
+    forever(() => {
+        if (input.runningTime() - timer > 5000) {
+            decal = -decal
+            timer = input.runningTime()
+        }
+        move_angleDegrees(decal, 100)
+    })
+})
+
 basic.forever(function () {
     // si activate
     if (activate) {
         //follow le motif
+        /*
         let power = calibration(40, 40);
+        
         move(power[0], power[1]);
+
+        
         old_speed_l = power[0];
         old_speed_r = power[1];
+        */
+
+        // move(50,50)
+        //move_angle(-45, 100);
+        // move_angleRadian(-10,100)
+
+
     }
 })
