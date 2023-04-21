@@ -102,7 +102,7 @@ function move_angleRadian(angle: number, power: number) {
 
 //const path = (x: number) => {return Math.sin(x)};
 // const path = (x: number) => { return x };
-const path = (x: number) => { return 5 * Math.sin(x * 5) };
+const path = (x: number) => { return 10000 * Math.sin(x * 1 / 4) };
 
 
 /**
@@ -111,33 +111,48 @@ const path = (x: number) => { return 5 * Math.sin(x * 5) };
  * @param {number} speed - The speed at which to follow the path
  */
 function followPath(path: (x: number) => number, speed: number) {
-    let x = 0; // Start at x = 0
+    // let x = 0; // Start at x = 0
     let previous_angle = 0
     // delta_angle = 0
+    let x = input.runningTime() / 1000
 
     // Continuously calculate the angle required to follow the path and move the robot
     forever(() => {
         // Calculate the angle required to follow the path at the current x value
-        let h = 0.0001 // tend vers 0
-        let slope = (path(x + h) - path(x)) / h;
+        let h = 0.0000001 // tend vers 0
+        let slope1 = (path(x + h) - path(x)) / h;
+        let slope2 = (path(x + h + h) - path(x + h)) / h;
         //console.log( slope)
-        console.logValue("path", path(x))
-        console.logValue("slope", slope)
+        //console.logValue("path", path(x))
+        // console.logValue("slope", slope1)
 
-        let angle = Math.atan(slope) * 180 / Math.PI;
+
+        // let angle = Math.atan(slope) * 180 / Math.PI;
+        // let angle = Math.atan(slope) * 90 / Math.PI;
+        //let angle = Math.atan(slope) * 45 / Math.PI;
+        let angle = (slope1 - slope2) / ((x + h + h) - (x + h))
         let delta_angle = angle - previous_angle;
         // delta_angle = delta_angle + angle - previous_angle
         previous_angle = angle
 
         // Move the robot with the calculated angle and speed
-        move_angleDegrees(delta_angle, speed);
+        // move_angleDegrees(delta_angle, speed);
+        move_angleDegrees(angle, speed);
 
-        console.logValue("angle ", angle)
-        console.logValue("delta_angle", delta_angle)
+        //console.logValue("angle ", angle)
+        console.log(angle)
+        // console.logValue("delta_angle", delta_angle)
         // Increment the x value
-        x += 0.0000001;
+        // x += 0.1;
 
-        previous_slope = slope
+        x = input.runningTime() / 1000
+        // console.logValue("x",x)
+
+        // sec
+
+
+        const vitesse_by_power = 0.387 / 2; // cm par sec par unit
+        previous_slope = slope1
 
         // Pause for a short time to allow the robot to move before calculating the next angle
         //pause(10);
@@ -147,8 +162,6 @@ function followPath(path: (x: number) => number, speed: number) {
 let previous_slope = (path(0 + 0.01) - path(0)) / 0.01;
 
 followPath(path, 100);
-
-
 
 
 input.onButtonPressed(Button.B, function () {

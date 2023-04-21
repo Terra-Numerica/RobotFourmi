@@ -121,9 +121,18 @@ input.onButtonPressed(Button.A, function () {
 })
 
 
+
 input.onButtonPressed(Button.B, function () {
-    main_methode = METHODE_FUNCTION;
-    f
+    let timer = input.runningTime()
+    let decal = 20
+    let delay = 4000
+    forever(() => {
+        if (input.runningTime() - timer > delay) {
+            decal = -decal
+            timer = input.runningTime()
+        }
+        move_angle(decal, 100)
+    })
 })
 
 /*
@@ -326,26 +335,6 @@ function process_follow(tag: number, boxIndex = 1) {
 }
 
 
-/**
- * Moves the robot with the given direction and power associated
- * The direction is defined by the angle given
- * The power is reparted in the wheel depending on the angle
- * @param {number} angle - The angle of the direction of the robot
- * @param {number} power - The power of the robot
- */
-function move_angle(angle, power) {
-    // If the angle is negative, then the robot will turn to the left
-    // If the angle is positive, then the robot will turn to the right
-    // 90° angle = full turn to the right
-    // -90° angle = full turn to the left
-    // 0° angle = no turn --> the robot will go straight forward
-
-    let left_power ;
-    let right_power ;
-    move(left_power, right_power);
-
-
-}
 
 /**
  * Moves the robot with the given direction and power associated
@@ -354,19 +343,20 @@ function move_angle(angle, power) {
  * @param {number} angle - The angle of the direction of the robot
  * @param {number} power - The power of the robot
  */
-function move_angle(angle, power) {
+function move_angle(angle: number, power: number) {
     // Convert the angle to radians
     angle = angle * Math.PI / 180;
-  
+
     // Calculate the left and right power using trigonometry
+    // The left power is calculated using the sine of the angle plus 45 degrees
+    // The right power is calculated using the cosine of the angle plus 45 degrees
     let left_power = Math.sin(angle + Math.PI / 4) * power;
     let right_power = Math.cos(angle + Math.PI / 4) * power;
-  
-    // Call the move function with the calculated powers
-    move(left_power, right_power);
-  }
-  
 
+    // Call the move function with the calculated powers
+    // The left and right powers are passed as parameters to the move function
+    move(left_power, right_power);
+}
 
 
 /*
@@ -519,8 +509,8 @@ IR.IR_callbackUser(function (msg) {
 ///////// IR /////////
 function methode_ir(msg: number): void {
     // have to be declared here because scope of "case"
-    let new_left_power : number;
-    let new_right_power : number;
+    let new_left_power: number;
+    let new_right_power: number;
 
     switch (msg) {
         case IR_UP:
@@ -536,7 +526,7 @@ function methode_ir(msg: number): void {
         case IR_LEFT:
             // if differencial ratio between left and right wheel power is too high, do nothing
             // avoid doing a 360° turn
-            new_left_power = left_wheel_power - increament_rotation 
+            new_left_power = left_wheel_power - increament_rotation
             new_right_power = right_wheel_power + increament_rotation
 
             // avoide divide by 0
@@ -551,7 +541,7 @@ function methode_ir(msg: number): void {
                 }
             }
 
-            
+
             break;
 
         case IR_RIGHT:
@@ -666,3 +656,4 @@ basic.forever(function () {
         increament_rotation = (left_wheel_power + right_wheel_power) * FACTOR_ROTATION;
     }
 })
+
