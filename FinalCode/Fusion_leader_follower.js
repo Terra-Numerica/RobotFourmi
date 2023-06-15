@@ -4,8 +4,8 @@
 
 // RADIO
 const RADIO_GROUP = 1;
-const LOST_CONTACT_VISUEL = "lost"
-const BACK_CONTACT_VISUEL = "back"
+const LOST_CONTACT_VISUEL = "lost";
+const BACK_CONTACT_VISUEL = "back";
 // PRINT
 const MESSAGE_START = 'R';
 const MESSAGE_STOP = 'S';
@@ -25,8 +25,8 @@ const IR_RIGHT = 201;
 const SCREEN_WIDTH = 320;
 const SCREEN_HEIGHT = 240;
 // Desired distance between leader and follower (in centimeter)
-const DISTANCE_MAX = 100;
-const DISTANCE_MIN = 50;
+const DISTANCE_MAX = 88;
+const DISTANCE_MIN = 38;
 // METHODE OF LEADER BOT
 const METHODE_IR = "IR";
 const METHODE_LINE = "LINE";
@@ -39,8 +39,15 @@ const FACTOR_ROTATION = 2 / 10; // angle apply at each press of rotation
 const MAX_DIFFERENCIAL_RATIO = 1 / 3; // max différencial between wheels
 // INTERACTION DELAY
 const DELAY_INPUT_IR = 500; //millisecond  // évite de spmmer la télécommande
-const DELAY_LOST_QR = 1000 // ms // évite de dire "lost" (et donc de tout stopper) à la moindre perte de contacte
-const DELAY_LOST_DEFINITIF = 2500 // ms
+const DELAY_LOST_QR = 1000; // ms // évite de dire "lost" (et donc de tout stopper) à la moindre perte de contacte
+const DELAY_LOST_DEFINITIF = 2500; // ms
+
+
+
+
+// RADIO REMODE controle
+const RADIO_LEFT_WHEEL = "left_wheel";
+const RADIO_RIGHT_WHEEL = "right_wheel";
 
 //////////////////////////////
 ///// GLOBALES VARIABLES /////
@@ -49,7 +56,7 @@ const DELAY_LOST_DEFINITIF = 2500 // ms
 // indicate if the robot is activated or not
 let activate = false;
 // indicate if the robot is lost or not
-let lost = false
+let lost = false;
 // date of the last interaction with the IR remote control
 let last_input_ir = input.runningTime();
 // date of the last time the QR code was seen
@@ -58,11 +65,15 @@ let last_time_qr_visible = input.runningTime();
 let left_wheel_power = 0;
 let right_wheel_power = 0;
 // power add during a rotation
-let increament_rotation: number;
+
+let increament_rotation = 0; // Undef
+
+
+//let increament_rotation: number;
 // methode used to by the leader bot
 let main_methode = DEFAULT_METHODE;
 // indicate if the robot is the leader or not
-let isLeader = false
+let isLeader = false;
 
 
 //////////////////////////////
@@ -71,7 +82,7 @@ let isLeader = false
 
 
 // set the radio group
-radio.setGroup(RADIO_GROUP)
+radio.setGroup(RADIO_GROUP);
 // init the huskylens cam to the algorithm of tag recognition
 huskylens.initMode(protocolAlgorithm.ALGORITHM_TAG_RECOGNITION);
 
@@ -97,43 +108,67 @@ for(let i = 0 ; i < 3 ; i++){
 // MAIN BUTTON
 input.onLogoEvent(TouchButtonEvent.Pressed, function () {
     activate ? turnOffRobot() : turnOnRobot();
-})
+});
 
 // IR instructions
 IR.IR_callbackUser(function (msg) {
     // if the robot is activated , it is turned off
     // else it is turned on
     if (msg == IR_ON_OFF) activate ? turnOffRobot() : turnOnRobot();
-})
+});
 
 // RADIO
 radio.onReceivedString(function (receivedString: string) {
+
+
     // if another robot sends messages related to visual contact
     if (receivedString == LOST_CONTACT_VISUEL) turnOffRobot();
     if (receivedString == BACK_CONTACT_VISUEL) turnOnRobot();
-})
+
+    // modifié autorisation de délais input
+    if (isLeader) {
+        console.logValue("receivedString", receivedString);
+        console.logValue("Left_convert", convertToText(IR_LEFT));
+        console.logValue("BoolLeft", receivedString == convertToText(IR_LEFT));
+        //if (receivedString == convertToText(IR_LEFT)) {
+        console.logValue("BoolBrut", "200" == convertToText(200));
+        if (receivedString == "200") {
+            music.playTone(Note.B5, 50);
+            methode_ir(IR_LEFT);
+        }
+        if (receivedString == convertToText(IR_RIGHT)) {
+            methode_ir(IR_RIGHT);
+        }
+        if (receivedString == convertToText(IR_UP)) {
+            methode_ir(IR_UP);
+        }
+    }
+
+});
+
+
 
 // the robot becomes the leader when the A button is pressed
 input.onButtonPressed(Button.A, function () {
-    isLeader = !isLeader
+    isLeader = !isLeader;
     // play a sound to indicate that the robot is now the leader
-    music.playTone(Note.C, 100)
-})
+    music.playTone(Note.C, 100);
+});
 
 
 
 input.onButtonPressed(Button.B, function () {
-    let timer = input.runningTime()
-    let decal = 20
-    let delay = 4000
+    let timer = input.runningTime();
+    let decal = 20;
+    let delay = 4000;
     forever(() => {
         if (input.runningTime() - timer > delay) {
-            decal = -decal
-            timer = input.runningTime()
+            decal = -decal;
+            timer = input.runningTime();
         }
-        move_angle(decal, 100)
+        move_angle(decal, 100);
     })
-})
+});
 
 /*
 input.onButtonPressed(Button.A, function () {
@@ -231,7 +266,7 @@ function getBoundedValue(v: number): number {
 // function qr : similar to function follow_motif
 // V2 de follow_motif
 function followe_qrV2(): void {
-    huskylens.request()
+    huskylens.request();
 
     // Follow order of priority --> left, right , front
     if (huskylens.isAppear(2, HUSKYLENSResultType_t.HUSKYLENSResultBlock)) { process_follow(2); }// left
@@ -241,15 +276,15 @@ function followe_qrV2(): void {
     else if (huskylens.isAppear(1, HUSKYLENSResultType_t.HUSKYLENSResultBlock)) {
         // Check if there are multiple boxes
         // From farthest to closest in terms of height
-        let max_index = 1
-        let max_height = huskylens.readeBox_index(1, 1, Content1.height)
-        let len_box = huskylens.getBox_S(1, HUSKYLENSResultType_t.HUSKYLENSResultBlock) // nombre de box
+        let max_index = 1;
+        let max_height = huskylens.readeBox_index(1, 1, Content1.height);
+        let len_box = huskylens.getBox_S(1, HUSKYLENSResultType_t.HUSKYLENSResultBlock); // nombre de box
 
         for (let i = 1; i <= len_box; i++) {
             // Box number starts at 1 , don't no why
             if (huskylens.readeBox_index(1, i, Content1.height) > max_height) {
-                max_height = huskylens.readeBox_index(1, i, Content1.height)
-                max_index = i
+                max_height = huskylens.readeBox_index(1, i, Content1.height);
+                max_index = i;
             }
         }
         // Follow the front with the maximum height == closest QR code
@@ -262,11 +297,11 @@ function followe_qrV2(): void {
         if (input.runningTime() - last_time_qr_visible > DELAY_LOST_QR) {
             // If lost time is greater than the established delay, then consider it as lost
             if (input.runningTime() - last_time_qr_visible > DELAY_LOST_DEFINITIF) {
-                move(0, 0)
+                move(0, 0);
             }
             else {
-                radio.sendString(LOST_CONTACT_VISUEL)
-                lost = true
+                radio.sendString(LOST_CONTACT_VISUEL);
+                lost = true;
             }
         }
 
@@ -284,16 +319,16 @@ function followe_qrV2(): void {
 function process_follow(tag: number, boxIndex = 1) {
     // If the QR code was previously lost, send a message and update the last visible time
     if (lost) {
-        lost = false
+        lost = false;
         // Send message to other 
-        last_time_qr_visible = input.runningTime()
-        radio.sendString(BACK_CONTACT_VISUEL)
+        last_time_qr_visible = input.runningTime();
+        radio.sendString(BACK_CONTACT_VISUEL);
     }
 
     // Apparent height of QR
-    let height = huskylens.readeBox_index(tag, boxIndex, Content1.height)
+    let height = huskylens.readeBox_index(tag, boxIndex, Content1.height);
     // X-coordinate of the detected box
-    let box_position = huskylens.readeBox_index(tag, boxIndex, Content1.xCenter)
+    let box_position = huskylens.readeBox_index(tag, boxIndex, Content1.xCenter);
 
     // Adjust box_position based on QR position
     // Left
@@ -311,8 +346,13 @@ function process_follow(tag: number, boxIndex = 1) {
     let dist = 1501.6 - 1259.41 * Math.pow(height, 0.0322027);
     */
 
-    // New formula
-    let dist = 509.327 - 46.6558 * Math.log(0.0000276626 - 234.427 * - height)
+    // Expérience formula
+    // let dist = 509.327 - 46.6558 * Math.log(0.0000276626 - 234.427 * - height)
+    // théorie formula
+    // D = d/(2 ∗ tan(taille_en_pixel ∗ taille_par_pixel/2))
+    let dist = 70 / 2 * Math.tan(0.1854 * height / 2);
+
+    // TODO : note : je pense que la formule ((d)/(2 tan(((0.001739 x)/(2))))) est plus fiable
     // coef directeur de y = ax+b --> a = ( ya - yb) / (xa - sb)
 
     let slop = (0 - MAX_POWER) / (DISTANCE_MIN - DISTANCE_MAX);
@@ -380,25 +420,25 @@ power
 function calibration(powerL: number, powerR: number): number {
 
     // Speed measure
-    let speedL = DFRobotMaqueenPlus.readSpeed(Motors1.M1)
-    let speedR = DFRobotMaqueenPlus.readSpeed(Motors1.M1)
+    let speedL = DFRobotMaqueenPlus.readSpeed(Motors1.M1);
+    let speedR = DFRobotMaqueenPlus.readSpeed(Motors1.M1);
 
     // Calculate the efficiency ratios of the motors (speed/power)
-    let efficiencyL = speedL / powerL // efficiency of the left motor
-    let efficiencyR = speedR / powerR // efficiency of the right motor
+    let efficiencyL = speedL / powerL; // efficiency of the left motor
+    let efficiencyR = speedR / powerR; // efficiency of the right motor
 
     // If the left motor is less efficient than the right motor, increase the right motor power
     if (efficiencyL < efficiencyR) {
         // Increase the power supplied to the right motor
-        let new_r = powerR + (efficiencyR - efficiencyL) * powerR
+        let new_r = powerR + (efficiencyR - efficiencyL) * powerR;
         // Return the updated powers for both motors
         return powerL, new_r;
     }
     else {
         // Increase the power supplied to the left motor
-        let new_l = powerL + (efficiencyL - efficiencyR) * powerL
+        let new_l = powerL + (efficiencyL - efficiencyR) * powerL;
         // Return the updated powers for both motors
-        return new_l, powerR
+        return new_l, powerR;
     }
 }
 
@@ -406,22 +446,22 @@ function calibration(powerL: number, powerR: number): number {
 // old unused function
 
 function follow_qr(): void {
-    huskylens.request()
+    huskylens.request();
     if (huskylens.isAppear(1, HUSKYLENSResultType_t.HUSKYLENSResultBlock)) {
 
         //CALCUL DE PUISSANCE
 
         // Hauteur max = environ 6/10 de l'écran ->3/5
         // taille apparante du QR
-        let height = huskylens.readeBox(1, Content1.height)
+        let height = huskylens.readeBox(1, Content1.height);
         //let widht = huskylens.readeBox(1,Content1.width) // Largeur : tou
-        let box_position = huskylens.readeBox(1, Content1.xCenter)  // 0 
+        let box_position = huskylens.readeBox(1, Content1.xCenter); // 0 
         // let MAX_POWER = power - power * height / SCREEN_HEIGHT
 
         // si prend tout l'écran : vitesse null
         //
 
-        let distance_factor = height / SCREEN_HEIGHT
+        let distance_factor = height / SCREEN_HEIGHT;
         let power = MAX_POWER - MAX_POWER * distance_factor;
 
         // Répartition de la puissance pour touner
@@ -448,8 +488,8 @@ function follow_qr(): void {
  * Turn off the RGB LEDs
  */
 function turnOffLEDs(): void {
-    DFRobotMaqueenPlus.setRGBLight(1, Color.OFF)
-    DFRobotMaqueenPlus.setRGBLight(2, Color.OFF)
+    DFRobotMaqueenPlus.setRGBLight(1, Color.OFF);
+    DFRobotMaqueenPlus.setRGBLight(2, Color.OFF);
 }
 
 // les diodes révelent la puissance mise dans les roues
@@ -460,19 +500,19 @@ function turnOffLEDs(): void {
  */
 function setLEDColorByPower(wheel: number, current_power: number): void {
 
-    let threshold = MAX_POWER / 3 // Three different colors
+    let threshold = MAX_POWER / 3; // Three different colors
     // Choose the LED color based on the power put into the wheel.
     // threshold 1
     if (current_power <= threshold) {
-        DFRobotMaqueenPlus.setRGBLight(wheel, Color.RED)
+        DFRobotMaqueenPlus.setRGBLight(wheel, Color.RED);
     }
     // threshold 2
     else if (current_power <= 2 * threshold) {
-        DFRobotMaqueenPlus.setRGBLight(wheel, Color.GREEN)
+        DFRobotMaqueenPlus.setRGBLight(wheel, Color.GREEN);
     }
     // threshold 3
     else if (current_power <= 3 * threshold) {
-        DFRobotMaqueenPlus.setRGBLight(wheel, Color.BLUE)
+        DFRobotMaqueenPlus.setRGBLight(wheel, Color.BLUE);
     }
 }
 
@@ -483,7 +523,7 @@ function setLEDColorByPower(wheel: number, current_power: number): void {
 // MAIN BUTTON
 input.onLogoEvent(TouchButtonEvent.Pressed, function () {
     activate ? turnOffRobot() : turnOnRobot();
-})
+});
 
 // IR instructions
 IR.IR_callbackUser(function (msg) {
@@ -499,7 +539,7 @@ IR.IR_callbackUser(function (msg) {
         last_input_ir = now;
     }
 
-})
+});
 
 
 ///////////////////////////////////////
@@ -526,12 +566,12 @@ function methode_ir(msg: number): void {
         case IR_LEFT:
             // if differencial ratio between left and right wheel power is too high, do nothing
             // avoid doing a 360° turn
-            new_left_power = left_wheel_power - increament_rotation
-            new_right_power = right_wheel_power + increament_rotation
+            new_left_power = left_wheel_power - increament_rotation;
+            new_right_power = right_wheel_power + increament_rotation;
 
             // avoide divide by 0
             if (Math.max(new_left_power, new_right_power) != 0) {
-                let ratio = Math.min(new_left_power, new_right_power) / Math.max(new_left_power, new_right_power)
+                let ratio = Math.min(new_left_power, new_right_power) / Math.max(new_left_power, new_right_power);
                 if (ratio < MAX_DIFFERENCIAL_RATIO) {
                     //temporaryDisplayMessage(convertToText(ratio),0)
                     break;
@@ -547,11 +587,11 @@ function methode_ir(msg: number): void {
         case IR_RIGHT:
             // if differencial ratio between left and right wheel power is too high, do nothing
             // avoid doing a 360° turn
-            new_left_power = left_wheel_power + increament_rotation
-            new_right_power = right_wheel_power - increament_rotation
+            new_left_power = left_wheel_power + increament_rotation;
+            new_right_power = right_wheel_power - increament_rotation;
 
             if (Math.max(new_left_power, new_right_power) != 0) {
-                let ratio = Math.min(new_left_power, new_right_power) / Math.max(new_left_power, new_right_power)
+                let ratio = Math.min(new_left_power, new_right_power) / Math.max(new_left_power, new_right_power);
                 if (ratio < MAX_DIFFERENCIAL_RATIO) {
                     //temporaryDisplayMessage(convertToText(ratio),0)
                     break;
@@ -584,7 +624,7 @@ function methode_line() {
         L3: 1, // Angle = 90 - 0 = 0°
         L2: 0.35, // Angle = 90-58 = 32 ; 90-32 = 58 ; 58/90 = 0.644 ; 1-0.644 = ... = 0.35
         L1: 0.12, // Angle = 1-79.12/90
-    }
+    };
 
     // rappele : ils sont symétrique 
     let captor_weight = [1, 0.35, 0.12];
@@ -604,38 +644,48 @@ function methode_line() {
 
     if (L1 && R1) {
         // move(100, 100)
-        move(80, 80)
+        move(80, 80);
     } else if (!(L2) && L1 && !(R1)) {
         // move(100, 80)
-        move(80, 60)
+        move(80, 60);
     } else if (L2 && L1) {
 
         //move(110, 60)
-        move(90, 40)
+        move(90, 40);
     } else if (L2 && !(L1)) {
         // move(90, 10)
-        move(110, 30)
+        move(110, 30);
     } else if (L3) {
         // move(120, 30)
-        move(100, 10)
+        move(100, 10);
     } else if (!(R2) && !(L1) && R1) {
         // move(80, 100)
-        move(60, 80)
+        move(60, 80);
     } else if (R2 && R1) {
         //move(60, 110)
-        move(40, 90)
+        move(40, 90);
     } else if (R2 && !(R1)) {
         // move(30, 110)
-        move(10, 90)
+        move(10, 90);
     } else if (R3) {
         // move(30, 120)
-        move(10, 100)
+        move(10, 100);
     }
 }
 
 ///////////////////////////////////
 //////////// MAIN LOOP ////////////
 ///////////////////////////////////
+
+
+
+
+
+
+
+
+
+
 
 
 
