@@ -16,11 +16,11 @@ const SOUND_ALARM = Note.C;
 const SOUND_CHOICE_A = Note.D;
 const SOUND_CHOICE_B = Note.E;
 // IR
-const IR_ON_OFF = 129;
-const IR_UP = 198;
-const IR_DOWN = 199;
-const IR_LEFT = 200;
-const IR_RIGHT = 201;
+const INSTRUCTION_ON_OFF = 129;
+const INSTRUCTION_UP = 198;
+const INSTRUCTION_DOWN = 199;
+const INSTRUCTION_LEFT = 200;
+const INSTRUCTION_RIGHT = 201;
 // SCREEN DIMENSION
 const SCREEN_WIDTH = 320;
 const SCREEN_HEIGHT = 240;
@@ -41,8 +41,6 @@ const MAX_DIFFERENCIAL_RATIO = 1 / 3; // max différencial between wheels
 const DELAY_INPUT_IR = 500; //millisecond  // évite de spmmer la télécommande
 const DELAY_LOST_QR = 1000; // ms // évite de dire "lost" (et donc de tout stopper) à la moindre perte de contacte
 const DELAY_LOST_DEFINITIF = 2500; // ms
-
-
 
 
 // RADIO REMODE controle
@@ -76,6 +74,10 @@ let main_methode = DEFAULT_METHODE;
 let isLeader = false;
 
 
+
+let haveALeaderDefined = false;
+
+
 //////////////////////////////
 //////////// INIT //////////// 
 //////////////////////////////
@@ -84,7 +86,7 @@ let isLeader = false;
 // set the radio group
 radio.setGroup(RADIO_GROUP);
 // init the huskylens cam to the algorithm of tag recognition
-huskylens.initMode(protocolAlgorithm.ALGORITHM_TAG_RECOGNITION);
+// huskylens.initMode(protocolAlgorithm.ALGORITHM_TAG_RECOGNITION);
 
 /*
 ANCIENNE VERSION DE DETERMINATION DU LEADER sur base de visuel du QR Code
@@ -114,46 +116,65 @@ input.onLogoEvent(TouchButtonEvent.Pressed, function () {
 IR.IR_callbackUser(function (msg) {
     // if the robot is activated , it is turned off
     // else it is turned on
-    if (msg == IR_ON_OFF) activate ? turnOffRobot() : turnOnRobot();
+    if (msg == INSTRUCTION_ON_OFF) activate ? turnOffRobot() : turnOnRobot();
 });
 
 // RADIO
 radio.onReceivedString(function (receivedString: string) {
 
-
     // if another robot sends messages related to visual contact
     if (receivedString == LOST_CONTACT_VISUEL) turnOffRobot();
     if (receivedString == BACK_CONTACT_VISUEL) turnOnRobot();
 
+    // init le protocole que si un leader
+    if (receivedString == HAVE_A_LEADER) {
+        huskylens.initMode(protocolAlgorithm.ALGORITHM_TAG_RECOGNITION);
+        haveALeaderDefined = true;
+
+    };
+
     // modifié autorisation de délais input
     if (isLeader) {
-        console.logValue("receivedString", receivedString);
-        console.logValue("Left_convert", convertToText(IR_LEFT));
-        console.logValue("BoolLeft", receivedString == convertToText(IR_LEFT));
-        //if (receivedString == convertToText(IR_LEFT)) {
-        console.logValue("BoolBrut", "200" == convertToText(200));
-        if (receivedString == "200") {
-            music.playTone(Note.B5, 50);
-            methode_ir(IR_LEFT);
+        
+        switch (receivedString){
+            case convertToText(INSTRUCTION_DOWN):
+                methode_teleInstruction(INSTRUCTION_DOWN);
+                break;
+            case convertToText(INSTRUCTION_LEFT):
+                methode_teleInstruction(INSTRUCTION_LEFT);
+                break;
+            case convertToText(INSTRUCTION_RIGHT) :
+                methode_teleInstruction(INSTRUCTION_RIGHT);
+                break;
+            case convertToText(INSTRUCTION_UP):
+                methode_teleInstruction(INSTRUCTION_UP);
+                break;
+
         }
-        if (receivedString == convertToText(IR_RIGHT)) {
-            methode_ir(IR_RIGHT);
-        }
-        if (receivedString == convertToText(IR_UP)) {
-            methode_ir(IR_UP);
-        }
+        
     }
 
 });
 
 
+const HAVE_A_LEADER = "have_a_leader";
 
 // the robot becomes the leader when the A button is pressed
 input.onButtonPressed(Button.A, function () {
     isLeader = !isLeader;
+
+    //permet d'éviter la caméra pour rien // mais marche qu'une seul fois
+    if(isLeader){
+        radio.sendString(HAVE_A_LEADER);
+        haveALeaderDefined = true;
+    }
+    else {
+        haveALeaderDefined = false
+    }
     // play a sound to indicate that the robot is now the leader
     music.playTone(Note.C, 100);
 });
+
 
 
 
@@ -348,6 +369,7 @@ function process_follow(tag: number, boxIndex = 1) {
 
     // Expérience formula
     // let dist = 509.327 - 46.6558 * Math.log(0.0000276626 - 234.427 * - height)
+
     // théorie formula
     // D = d/(2 ∗ tan(taille_en_pixel ∗ taille_par_pixel/2))
     let dist = 70 / 2 * Math.tan(0.1854 * height / 2);
@@ -402,11 +424,6 @@ function move_angle(angle: number, power: number) {
 /*
 Angle de 0 = position à 1/2* SCREEN_WIDTH
 power 
-
-
-
-
-
 */
 
 
@@ -459,7 +476,6 @@ function follow_qr(): void {
         // let MAX_POWER = power - power * height / SCREEN_HEIGHT
 
         // si prend tout l'écran : vitesse null
-        //
 
         let distance_factor = height / SCREEN_HEIGHT;
         let power = MAX_POWER - MAX_POWER * distance_factor;
@@ -532,9 +548,9 @@ IR.IR_callbackUser(function (msg) {
     // delay command
     if ((now - last_input_ir) > DELAY_INPUT_IR) {
 
-        if (msg == IR_ON_OFF) activate ? turnOffRobot() : turnOnRobot();
+        if (msg == INSTRUCTION_ON_OFF) activate ? turnOffRobot() : turnOnRobot();
         // Add vérification option OU pas on verra
-        if (activate && main_methode === METHODE_IR && isLeader) methode_ir(msg);
+        if (activate && main_methode === METHODE_IR && isLeader) methode_teleInstruction(msg);
 
         last_input_ir = now;
     }
@@ -546,24 +562,24 @@ IR.IR_callbackUser(function (msg) {
 //////////// MAIN FUNCTION ////////////
 ///////////////////////////////////////
 
-///////// IR /////////
-function methode_ir(msg: number): void {
+///////// IR or Radio instructions /////////
+function methode_teleInstruction(msg: number): void {
     // have to be declared here because scope of "case"
     let new_left_power: number;
     let new_right_power: number;
 
     switch (msg) {
-        case IR_UP:
+        case INSTRUCTION_UP:
             left_wheel_power += UPGRADE_SPEED_POWER;
             right_wheel_power += UPGRADE_SPEED_POWER;
             break;
 
-        case IR_DOWN:
+        case INSTRUCTION_DOWN:
             left_wheel_power -= UPGRADE_SPEED_POWER;
             right_wheel_power -= UPGRADE_SPEED_POWER;
             break;
 
-        case IR_LEFT:
+        case INSTRUCTION_LEFT:
             // if differencial ratio between left and right wheel power is too high, do nothing
             // avoid doing a 360° turn
             new_left_power = left_wheel_power - increament_rotation;
@@ -584,7 +600,7 @@ function methode_ir(msg: number): void {
 
             break;
 
-        case IR_RIGHT:
+        case INSTRUCTION_RIGHT:
             // if differencial ratio between left and right wheel power is too high, do nothing
             // avoid doing a 360° turn
             new_left_power = left_wheel_power + increament_rotation;
@@ -678,22 +694,11 @@ function methode_line() {
 ///////////////////////////////////
 
 
-
-
-
-
-
-
-
-
-
-
-
 basic.forever(function () {
     // if the robot is not the leader
     if (!isLeader) {
         // and if the robot is actived
-        if (activate) {
+        if (activate && haveALeaderDefined) {
             // the robot follow the qr code of the previous robot
             followe_qrV2();
         }
