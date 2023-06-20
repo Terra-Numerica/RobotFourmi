@@ -58,10 +58,6 @@ input.onButtonPressed(Button.B, function () {
 
 let activate = false;
 
-// DFRobotMaqueenPlus.readSpeed(Motors1.M1)
-// DFRobotMaqueenPlus.readeDistance(Motors1.M1)
-
-
 basic.forever(function () {
     // si activate
     if (activate) {
