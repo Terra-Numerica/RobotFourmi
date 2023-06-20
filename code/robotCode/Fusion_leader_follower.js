@@ -74,10 +74,6 @@ let main_methode = DEFAULT_METHODE;
 let isLeader = false;
 
 
-
-let haveALeaderDefined = false;
-
-
 //////////////////////////////
 //////////// INIT //////////// 
 //////////////////////////////
@@ -86,7 +82,7 @@ let haveALeaderDefined = false;
 // set the radio group
 radio.setGroup(RADIO_GROUP);
 // init the huskylens cam to the algorithm of tag recognition
-// huskylens.initMode(protocolAlgorithm.ALGORITHM_TAG_RECOGNITION);
+huskylens.initMode(protocolAlgorithm.ALGORITHM_TAG_RECOGNITION);
 
 /*
 ANCIENNE VERSION DE DETERMINATION DU LEADER sur base de visuel du QR Code
@@ -100,8 +96,6 @@ for(let i = 0 ; i < 3 ; i++){
     }
 }
 */
-
-
 
 ///////////////////////////////////////
 //////////// EVENT and CHOICE//////////
@@ -126,24 +120,18 @@ radio.onReceivedString(function (receivedString: string) {
     if (receivedString == LOST_CONTACT_VISUEL) turnOffRobot();
     if (receivedString == BACK_CONTACT_VISUEL) turnOnRobot();
 
-    // init le protocole que si un leader
-    if (receivedString == HAVE_A_LEADER) {
-        huskylens.initMode(protocolAlgorithm.ALGORITHM_TAG_RECOGNITION);
-        haveALeaderDefined = true;
-
-    };
 
     // modifié autorisation de délais input
     if (isLeader) {
-        
-        switch (receivedString){
+
+        switch (receivedString) {
             case convertToText(INSTRUCTION_DOWN):
                 methode_teleInstruction(INSTRUCTION_DOWN);
                 break;
             case convertToText(INSTRUCTION_LEFT):
                 methode_teleInstruction(INSTRUCTION_LEFT);
                 break;
-            case convertToText(INSTRUCTION_RIGHT) :
+            case convertToText(INSTRUCTION_RIGHT):
                 methode_teleInstruction(INSTRUCTION_RIGHT);
                 break;
             case convertToText(INSTRUCTION_UP):
@@ -151,7 +139,7 @@ radio.onReceivedString(function (receivedString: string) {
                 break;
 
         }
-        
+
     }
 
 });
@@ -163,14 +151,6 @@ const HAVE_A_LEADER = "have_a_leader";
 input.onButtonPressed(Button.A, function () {
     isLeader = !isLeader;
 
-    //permet d'éviter la caméra pour rien // mais marche qu'une seul fois
-    if(isLeader){
-        radio.sendString(HAVE_A_LEADER);
-        haveALeaderDefined = true;
-    }
-    else {
-        haveALeaderDefined = false
-    }
     // play a sound to indicate that the robot is now the leader
     music.playTone(Note.C, 100);
 });
@@ -179,8 +159,10 @@ input.onButtonPressed(Button.A, function () {
 
 
 input.onButtonPressed(Button.B, function () {
+    
+    
     let timer = input.runningTime();
-    let decal = 20;
+    let decal = 20; // risque de perte avec un angle supérieur
     let delay = 4000;
     forever(() => {
         if (input.runningTime() - timer > delay) {
@@ -189,13 +171,23 @@ input.onButtonPressed(Button.B, function () {
         }
         move_angle(decal, 100);
     })
-});
+    
+    /*
+    // V2
+    // angle plus droit --> plus grand risque de perte : mais plus visuel
+    let tourdroit = 3 *1000
+    let virage = 0.7 * 1000
+    let decal = 15;
 
-/*
-input.onButtonPressed(Button.A, function () {
-    main_methode = METHODE_LINE;
-})
-*/
+    forever(() => {
+        decal = -decal
+        move(decal,100)
+        basic.pause(virage)
+        move_angle(0,100)
+        basic.pause(tourdroit)
+    })
+    */
+});
 
 ////////////////////////////////////////
 ////////////MOVING FUNCTIONS////////////
@@ -368,11 +360,11 @@ function process_follow(tag: number, boxIndex = 1) {
     */
 
     // Expérience formula
-    // let dist = 509.327 - 46.6558 * Math.log(0.0000276626 - 234.427 * - height)
+    let dist = 509.327 - 46.6558 * Math.log(0.0000276626 - 234.427 * - height)
 
     // théorie formula
     // D = d/(2 ∗ tan(taille_en_pixel ∗ taille_par_pixel/2))
-    let dist = 70 / 2 * Math.tan(0.1854 * height / 2);
+    //let dist = 70 / 2 * Math.tan(0.1854 * height / 2);
 
     // TODO : note : je pense que la formule ((d)/(2 tan(((0.001739 x)/(2))))) est plus fiable
     // coef directeur de y = ax+b --> a = ( ya - yb) / (xa - sb)
@@ -383,7 +375,12 @@ function process_follow(tag: number, boxIndex = 1) {
     // Calculation of power distribution for turning
 
     // if the QR is all the way to the left, powerL = 0
-    let powerL = (power * box_position / SCREEN_WIDTH);
+    let angle = box_position / SCREEN_WIDTH
+    // limitation d'Angle
+    if(angle < 0.2) angle = 0.2
+
+    let powerL = (power * angle);
+
     // if the QR is all the way to the right, powerR = 0
     //let powerR = (power - power * box_position / SCREEN_WIDTH);
     let powerR = power - powerL;
@@ -698,7 +695,7 @@ basic.forever(function () {
     // if the robot is not the leader
     if (!isLeader) {
         // and if the robot is actived
-        if (activate && haveALeaderDefined) {
+        if (activate) {
             // the robot follow the qr code of the previous robot
             followe_qrV2();
         }
